@@ -1,0 +1,295 @@
+# FHA cash-to-close calculator — default assumptions.
+#
+# Every number here is a placeholder for something that changes annually
+# (FHA limits, MIP rates, DPA program terms) or is a rough regional estimate
+# you should tune to your own market. Nothing in this file is authoritative.
+# Verify against HUD's official published figures and the current mortgagee
+# letter before relying on any result from this tool.
+
+[meta]
+last_verified = "2026-07"
+notes = "Verify FHA limits at HUD's lookup tool and MIP rates against the current mortgagee letter before relying on results."
+
+# ---------------------------------------------------------------------------
+# Core FHA rules (calc/loan.py, calc/mip.py, calc/credits.py)
+# ---------------------------------------------------------------------------
+
+[fha]
+ufmip_rate = 0.0175
+annual_mip_default = 0.0055          # fallback when no mip.rules entry matches
+min_down_580_plus = 0.035
+min_down_500_579 = 0.10
+fha_min_credit_score = 500           # below this, FHA is not available at all
+# Many lenders overlay their own, stricter minimum around 620-640 even though
+# FHA's own floor is 580. Surface a warning for scores in [580, this value).
+lender_overlay_score_threshold = 620
+max_seller_concession_pct = 0.06
+# Down payment >= this fraction drops MIP duration from life-of-loan to 11 yrs.
+mip_11_year_down_pct_threshold = 0.10
+
+# ---------------------------------------------------------------------------
+# County loan limits — 2026 figures. Verify at hud.gov/program_offices/housing/sfh/lender/origination/limits
+# ---------------------------------------------------------------------------
+
+[loan_limits]
+national_floor = 541287
+national_ceiling = 1249125
+
+[loan_limits.counties]
+"Greenville, SC" = 541287
+"Spartanburg, SC" = 541287
+
+# ---------------------------------------------------------------------------
+# Annual MIP lookup table (calc/mip.py). Matched by finding the tightest
+# rule where loan_term_years <= term_years_max, ltv <= ltv_max, and
+# total_loan_amount <= loan_amount_max (omitted = unbounded). Falls back to
+# fha.annual_mip_default if nothing matches. This mirrors the structure of
+# the current FHA mortgagee letter's MIP table but is a first-year
+# approximation — verify against the current letter before relying on it.
+# ---------------------------------------------------------------------------
+
+[[mip.rules]]  # term <= 15y, LTV <= 90%, loan <= threshold
+term_years_max = 15
+ltv_max = 0.90
+loan_amount_max = 726200
+rate = 0.0015
+
+[[mip.rules]]  # term <= 15y, LTV <= 90%, loan > threshold
+term_years_max = 15
+ltv_max = 0.90
+rate = 0.0040
+
+[[mip.rules]]  # term <= 15y, LTV > 90%, loan <= threshold
+term_years_max = 15
+ltv_max = 1.50
+loan_amount_max = 726200
+rate = 0.0040
+
+[[mip.rules]]  # term <= 15y, LTV > 90%, loan > threshold
+term_years_max = 15
+ltv_max = 1.50
+rate = 0.0065
+
+[[mip.rules]]  # term > 15y (typ. 30y), LTV <= 95%, loan <= threshold
+term_years_max = 40
+ltv_max = 0.95
+loan_amount_max = 726200
+rate = 0.0050
+
+[[mip.rules]]  # term > 15y (typ. 30y), LTV <= 95%, loan > threshold
+term_years_max = 40
+ltv_max = 0.95
+rate = 0.0070
+
+[[mip.rules]]  # term > 15y (typ. 30y), LTV > 95%, loan <= threshold — common case
+term_years_max = 40
+ltv_max = 1.50
+loan_amount_max = 726200
+rate = 0.0055
+
+[[mip.rules]]  # term > 15y (typ. 30y), LTV > 95%, loan > threshold
+term_years_max = 40
+ltv_max = 1.50
+rate = 0.0075
+
+# ---------------------------------------------------------------------------
+# Closing costs (calc/closing.py)
+# ---------------------------------------------------------------------------
+
+[closing_costs]
+mode = "percentage"          # or "itemized"
+pct_low = 0.02
+pct_mid = 0.035
+pct_high = 0.05
+
+# Itemized mode. `basis = "pct_of_loan"` ranges are fractions of
+# base_loan_amount; `basis = "flat"` ranges are dollars. `enabled = false`
+# items are excluded by default but can be turned on via CLI flags.
+# `required = true` items cannot be disabled.
+
+[closing_costs.items.origination]
+label = "Loan origination / underwriting / processing"
+basis = "pct_of_loan"
+low = 0.005
+high = 0.01
+enabled = true
+
+[closing_costs.items.appraisal]
+label = "Appraisal (FHA appraisal required)"
+basis = "flat"
+low = 350
+high = 1000
+enabled = true
+
+[closing_costs.items.credit_report]
+label = "Credit report"
+basis = "flat"
+low = 30
+high = 100
+enabled = true
+
+[closing_costs.items.lenders_title]
+label = "Lender's title insurance"
+basis = "flat"
+low = 300
+high = 1500
+enabled = true
+
+[closing_costs.items.owners_title]
+label = "Owner's title insurance (optional)"
+basis = "flat"
+low = 400
+high = 900
+enabled = false
+
+[closing_costs.items.title_search]
+label = "Title search"
+basis = "flat"
+low = 200
+high = 800
+enabled = true
+
+[closing_costs.items.settlement_fee]
+label = "Settlement / escrow fee"
+basis = "flat"
+low = 350
+high = 1000
+enabled = true
+
+[closing_costs.items.recording_fees]
+label = "Recording fees"
+basis = "flat"
+low = 20
+high = 250
+enabled = true
+
+[closing_costs.items.attorney_fee]
+label = "Closing attorney fee"
+basis = "flat"
+low = 500
+high = 1200
+enabled = true
+required = true
+note = "South Carolina is an attorney-closing state; this is mandatory, not optional."
+
+[closing_costs.items.home_inspection]
+label = "Home inspection"
+basis = "flat"
+low = 300
+high = 500
+enabled = true
+
+[closing_costs.items.termite_inspection]
+label = "Termite / WDO inspection"
+basis = "flat"
+low = 75
+high = 150
+enabled = true
+note = "Common and often required in SC."
+
+[closing_costs.items.radon_inspection]
+label = "Radon inspection (optional)"
+basis = "flat"
+low = 100
+high = 150
+enabled = false
+
+[closing_costs.items.septic_inspection]
+label = "Septic inspection (optional)"
+basis = "flat"
+low = 300
+high = 500
+enabled = false
+
+[closing_costs.items.well_inspection]
+label = "Well inspection (optional)"
+basis = "flat"
+low = 150
+high = 250
+enabled = false
+
+[closing_costs.items.sewer_scope]
+label = "Sewer scope (optional)"
+basis = "flat"
+low = 250
+high = 400
+enabled = false
+
+[closing_costs.items.transfer_tax]
+label = "Transfer tax / deed stamps"
+basis = "flat"
+low = 0
+high = 0
+enabled = true
+note = "In SC customarily seller-paid; defaults to $0 for the buyer. Verify locally."
+
+[closing_costs.items.hoa_transfer_fee]
+label = "HOA transfer / estoppel fee"
+basis = "flat"
+low = 0
+high = 500
+enabled = true
+only_if_hoa = true
+note = "Only applied when annual HOA dues are greater than $0."
+
+# ---------------------------------------------------------------------------
+# Prepaids & escrow (calc/prepaids.py)
+# ---------------------------------------------------------------------------
+
+[prepaids]
+tax_escrow_months = 3
+ins_escrow_months = 2
+# Used only when PropertyInputs doesn't supply a figure directly.
+default_property_tax_rate = 0.0050   # fraction of purchase price, annualized
+default_hoi_rate = 0.0035            # fraction of purchase price, annualized
+
+# ---------------------------------------------------------------------------
+# Down payment assistance programs (calc/credits.py)
+# Terms and funding cycles reset annually — verify current terms with SC
+# Housing before relying on any of these.
+# ---------------------------------------------------------------------------
+
+[[dpa.programs]]
+key = "palmetto-home-advantage-0"
+label = "Palmetto Home Advantage (0% forgivable second)"
+kind = "pct_of_loan"
+value = 0.00
+min_credit_score = 640
+
+[[dpa.programs]]
+key = "palmetto-home-advantage-3"
+label = "Palmetto Home Advantage (3% forgivable second)"
+kind = "pct_of_loan"
+value = 0.03
+min_credit_score = 640
+
+[[dpa.programs]]
+key = "palmetto-home-advantage-4"
+label = "Palmetto Home Advantage (4% forgivable second)"
+kind = "pct_of_loan"
+value = 0.04
+min_credit_score = 640
+
+[[dpa.programs]]
+key = "palmetto-heroes"
+label = "Palmetto Heroes ($10,000 forgivable)"
+kind = "flat"
+value = 10000
+min_credit_score = 580
+notes = "For teachers, nurses, law enforcement, corrections, firefighters, EMTs, paramedics, veterans, active duty, and National Guard. First-come first-served with annual funding cycles — confirm funds are still available."
+
+# ---------------------------------------------------------------------------
+# Recommended reserve — not FHA-required, a planning cushion only
+# ---------------------------------------------------------------------------
+
+[reserve]
+piti_months_default = 3
+moving_costs_default = 1500
+immediate_repairs_default = 1000
+
+# ---------------------------------------------------------------------------
+# DTI (calc/monthly.py) — informational only, not an approval prediction
+# ---------------------------------------------------------------------------
+
+[dti]
+target_back_end = 0.43

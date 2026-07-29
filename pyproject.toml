@@ -1,0 +1,33 @@
+[project]
+name = "fha-calc"
+version = "0.1.0"
+description = "Local, offline FHA cash-to-close calculator"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "pytesseract>=0.3.10",
+    "Pillow>=10.0",
+    "opencv-python-headless>=4.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "hypothesis>=6.100",
+]
+
+[project.scripts]
+fha-calc = "fha_calc.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["fha_calc*"]
+
+[tool.setuptools.package-data]
+"fha_calc.config" = ["*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

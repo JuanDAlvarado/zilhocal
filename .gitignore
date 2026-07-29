@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+build/
+dist/
+*.log
+.DS_Store
+
+# Local Claude Code settings (machine-specific permissions)
+.claude/settings.local.json
+
+# OCR result cache (local, keyed by image hash)
+.fha_calc_cache/

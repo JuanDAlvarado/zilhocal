@@ -29,6 +29,10 @@ class Word:
     y: int
     w: int
     h: int
+    # (block_num, par_num, line_num) from tesseract — words sharing this
+    # tuple sit on the same visual line, which is what extract.py uses to
+    # pair a label ("Tax:") with the value to its right or on the line below.
+    line_id: tuple[int, int, int] = (0, 0, 0)
 
 
 @dataclass(frozen=True)
@@ -105,6 +109,7 @@ def run_ocr(image_path: str | Path, denoise: bool = False, psm: int = 6) -> OcrR
                 y=int(data["top"][i]),
                 w=int(data["width"][i]),
                 h=int(data["height"][i]),
+                line_id=(data["block_num"][i], data["par_num"][i], data["line_num"][i]),
             )
         )
 

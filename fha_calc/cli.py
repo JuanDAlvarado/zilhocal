@@ -74,6 +74,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--monthly-debts", help="optional, enables the informational DTI check")
 
     parser.add_argument("--json", dest="json_path", metavar="PATH", help="export machine-readable result")
+    parser.add_argument("--csv", dest="csv_path", metavar="PATH", help="export a CSV of every line item")
     parser.add_argument("--explain", action="store_true", help="print every intermediate value")
     parser.add_argument("--config", dest="config_path", help="path to a custom defaults.toml")
 
@@ -448,6 +449,12 @@ def main(argv: list[str] | None = None) -> int:
 
         write_json(result, args.json_path)
         print(f"\nWrote JSON export to {args.json_path}")
+
+    if args.csv_path:
+        from fha_calc.report import write_csv
+
+        write_csv(result, args.csv_path)
+        print(f"\nWrote CSV export to {args.csv_path}")
 
     return 0
 

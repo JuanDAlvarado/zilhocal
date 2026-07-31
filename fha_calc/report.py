@@ -1,14 +1,15 @@
-"""Text table output (§11), --explain derivation dump, and the accuracy
-disclaimer (§15). JSON export lives here too (added in a later stage)."""
+"""Text table output (§11), --explain derivation dump, JSON/CSV export, and
+the accuracy disclaimer (§15)."""
 
 from __future__ import annotations
 
+import csv
 import dataclasses
 import json
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
-from fha_calc.models import CalculationResult, CostEstimate
+from fha_calc.models import CalculationResult, CostEstimate, round_money
 
 LABEL_WIDTH = 42
 COL_WIDTH = 12
@@ -233,3 +234,50 @@ def write_json(result: CalculationResult, path: str | Path) -> None:
     with open(path, "w") as f:
         json.dump(to_json_dict(result), f, indent=2)
         f.write("\n")
+
+
+def to_csv_rows(result: CalculationResult) -> list[list[str]]:
+    """One row per line item, mirroring the three report sections. Ranged
+    figures populate low/likely/high; flat figures (e.g. monthly payment
+    lines) only populate `likely`."""
+    header = ["section", "label", "low", "likely", "high"]
+    rows: list[list[str]] = [header]
+
+    def cash_row(label: str, est: CostEstimate) -> list[str]:
+        return ["cash_to_close", label, str(round_money(est.low)), str(round_money(est.likely)), str(round_money(est.high))]
+
+    def flat_row(section: str, label: str, value: Decimal) -> list[str]:
+        return [section, label, "", str(round_money(value)), ""]
+
+    label = f"Purchase price ({result.property_inputs.address})" if result.property_inputs.address else "Purchase price"
+    rows.append(flat_row("property", label, result.property_inputs.purchase_price))
+
+    rows.append(cash_row("Down payment", result.cash_to_close.down_payment))
+    rows.append(cash_row("Closing costs", result.cash_to_close.closing_costs))
+    rows.append(cash_row("Prepaids & escrow setup", result.cash_to_close.prepaids_and_escrow))
+    rows.append(cash_row("Upfront MIP (cash component)", result.cash_to_close.ufmip_cash_component))
+    rows.append(cash_row("Less: seller concessions", result.cash_to_close.seller_concessions_applied))
+    rows.append(flat_row("cash_to_close", "Less: lender credits", result.credits.lender_credits))
+    rows.append(flat_row("cash_to_close", "Less: DPA", result.credits.dpa_amount))
+    rows.append(cash_row("TOTAL CASH NEEDED", result.cash_to_close.total_cash_needed))
+    rows.append(cash_row("Cash from own savings", result.cash_to_close.cash_from_own_savings))
+    rows.append(flat_row("cash_to_close", "Earnest money already paid", result.credits.earnest_money_already_paid))
+    rows.append(flat_row("cash_to_close", "Suggested reserve", result.cash_to_close.reserve.total))
+
+    rows.append(flat_row("monthly", "Principal & interest", result.monthly.principal_and_interest))
+    rows.append(flat_row("monthly", "MIP", result.monthly.mip))
+    rows.append(flat_row("monthly", "Property tax", result.monthly.property_tax))
+    rows.append(flat_row("monthly", "Homeowners insurance", result.monthly.homeowners_insurance))
+    rows.append(flat_row("monthly", "HOA", result.monthly.hoa))
+    rows.append(flat_row("monthly", "TOTAL", result.monthly.total))
+
+    if result.dti is not None:
+        rows.append(flat_row("dti", "Back-end DTI (fraction)", result.dti.back_end_dti))
+
+    return rows
+
+
+def write_csv(result: CalculationResult, path: str | Path) -> None:
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(to_csv_rows(result))

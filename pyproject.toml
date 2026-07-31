@@ -15,9 +15,13 @@ dev = [
     "pytest>=8.0",
     "hypothesis>=6.100",
 ]
+web = [
+    "flask>=3.0",
+]
 
 [project.scripts]
 fha-calc = "fha_calc.cli:main"
+fha-calc-web = "fha_calc.web.app:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -28,6 +32,7 @@ include = ["fha_calc*"]
 
 [tool.setuptools.package-data]
 "fha_calc.config" = ["*.toml"]
+"fha_calc.web" = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

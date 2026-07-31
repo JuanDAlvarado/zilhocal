@@ -207,14 +207,14 @@ def _render_explain(result: CalculationResult) -> list[str]:
     return lines
 
 
-def _json_safe(value):
+def json_safe(value):
     if isinstance(value, Decimal):
         # Exact string, not rounded: this field could be a dollar amount or
         # a rate/percentage (e.g. interest_rate=0.065), and cent-rounding
         # every Decimal indiscriminately would corrupt the latter.
         return str(value)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        out = {f.name: _json_safe(getattr(value, f.name)) for f in dataclasses.fields(value)}
+        out = {f.name: json_safe(getattr(value, f.name)) for f in dataclasses.fields(value)}
         # dataclasses.fields() only sees declared fields, not computed
         # @property members (Prepaids.total, ReserveEstimate.total,
         # MonthlyPayment.total) — include those too, so the JSON export
@@ -223,12 +223,12 @@ def _json_safe(value):
             if name.startswith("_") or name in out:
                 continue
             if isinstance(getattr(type(value), name, None), property):
-                out[name] = _json_safe(getattr(value, name))
+                out[name] = json_safe(getattr(value, name))
         return out
     if isinstance(value, (list, tuple)):
-        return [_json_safe(v) for v in value]
+        return [json_safe(v) for v in value]
     if isinstance(value, dict):
-        return {k: _json_safe(v) for k, v in value.items()}
+        return {k: json_safe(v) for k, v in value.items()}
     return value
 
 
@@ -237,7 +237,7 @@ def to_json_dict(result: CalculationResult) -> dict:
     "9975.000") rather than JSON numbers, since JSON has no decimal type and
     round-tripping through float would reintroduce the precision loss
     Decimal exists to avoid. Round for display at the consumer's discretion."""
-    return _json_safe(result)
+    return json_safe(result)
 
 
 def write_json(result: CalculationResult, path: str | Path) -> None:

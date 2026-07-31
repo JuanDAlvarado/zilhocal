@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>zilhocal — FHA Cash-to-Close Calculator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>zilhocal</h1>
+  <p class="subtitle">FHA cash-to-close calculator — a planning aid, not a quote.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1. Paste a listing screenshot <span class="optional">(optional)</span></h2>
+    <div id="dropzone" tabindex="0">
+      <p id="dropzone-text">Paste a screenshot (Ctrl+V), drag &amp; drop an image, or
+        <label for="file-input" class="link">choose a file</label>.</p>
+      <input type="file" id="file-input" accept="image/*" hidden>
+      <img id="preview" hidden alt="Pasted screenshot preview">
+    </div>
+    <p id="ocr-status" class="status" hidden></p>
+  </section>
+
+  <section class="card">
+    <h2>2. Property &amp; loan details</h2>
+    <p class="hint">Anything filled in from a screenshot is flagged below its confidence —
+      review and correct it before calculating. Nothing from OCR is ever trusted blindly.</p>
+
+    <form id="calc-form">
+      <fieldset>
+        <legend>Property</legend>
+
+        <label class="field">
+          <span class="field-label">Address <span class="optional">(display only)</span></span>
+          <input type="text" name="address" id="input-address">
+        </label>
+
+        <label class="field">
+          <span class="field-label">Purchase price <span class="badge" id="badge-purchase_price" hidden></span></span>
+          <select id="price-candidates" hidden></select>
+          <input type="text" inputmode="decimal" name="purchase_price" id="input-purchase_price" required placeholder="e.g. 285000">
+          <small class="source" id="source-purchase_price"></small>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Annual property tax <span class="optional">(blank = estimate from price)</span> <span class="badge" id="badge-annual_property_tax" hidden></span></span>
+          <input type="text" inputmode="decimal" name="annual_property_tax" id="input-annual_property_tax">
+          <small class="source" id="source-annual_property_tax"></small>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Annual HOA dues <span class="badge" id="badge-annual_hoa" hidden></span></span>
+          <input type="text" inputmode="decimal" name="annual_hoa" id="input-annual_hoa" value="0">
+          <small class="source" id="source-annual_hoa"></small>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Annual homeowners insurance <span class="optional">(blank = estimate from price)</span> <span class="badge" id="badge-annual_homeowners_insurance" hidden></span></span>
+          <input type="text" inputmode="decimal" name="annual_homeowners_insurance" id="input-annual_homeowners_insurance">
+          <small class="source" id="source-annual_homeowners_insurance"></small>
+        </label>
+
+        <label class="field">
+          <span class="field-label">County <span class="hint-inline">(for the FHA loan-limit check)</span> <span class="badge" id="badge-county" hidden></span></span>
+          <select name="county_select" id="county-select">
+            <option value="">— none / not listed —</option>
+            <option value="__custom__">Other (type below)</option>
+          </select>
+          <input type="text" name="county" id="input-county" placeholder="e.g. Greenville, SC" hidden>
+          <small class="source" id="source-county"></small>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Buyer &amp; loan</legend>
+
+        <label class="field">
+          <span class="field-label">Credit score</span>
+          <input type="number" name="credit_score" min="300" max="850" required placeholder="e.g. 680">
+        </label>
+
+        <label class="field">
+          <span class="field-label">Down payment % <span class="optional">(blank = tier minimum)</span></span>
+          <input type="text" inputmode="decimal" name="down_pct" placeholder="e.g. 3.5">
+        </label>
+
+        <label class="field">
+          <span class="field-label">Interest rate (annual, %)</span>
+          <input type="text" inputmode="decimal" name="rate" required placeholder="e.g. 6.5">
+        </label>
+
+        <label class="field">
+          <span class="field-label">Loan term</span>
+          <select name="term">
+            <option value="30" selected>30 years</option>
+            <option value="20">20 years</option>
+            <option value="15">15 years</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Upfront MIP (UFMIP)</span>
+          <select name="finance_ufmip">
+            <option value="true" selected>Finance it (rolled into the loan)</option>
+            <option value="false">Pay in cash at closing</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Closing day of month</span>
+          <input type="number" name="closing_day" min="1" max="31" value="15">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Credits &amp; concessions</legend>
+
+        <label class="field">
+          <span class="field-label">Seller concessions</span>
+          <input type="text" inputmode="decimal" name="seller_concessions" value="0">
+        </label>
+
+        <label class="field">
+          <span class="field-label">Lender credits</span>
+          <input type="text" inputmode="decimal" name="lender_credits" value="0">
+        </label>
+
+        <label class="field">
+          <span class="field-label">Down payment assistance</span>
+          <select name="dpa_select" id="dpa-select">
+            <option value="" selected>None</option>
+            <option value="__custom__">Custom amount</option>
+          </select>
+          <input type="text" inputmode="decimal" id="dpa-custom" placeholder="Dollar amount" hidden>
+          <small class="source" id="dpa-notes"></small>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Gift funds</span>
+          <input type="text" inputmode="decimal" name="gift" value="0">
+        </label>
+
+        <label class="field">
+          <span class="field-label">Earnest money already paid</span>
+          <input type="text" inputmode="decimal" name="earnest" value="0">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Closing costs</legend>
+
+        <label class="field">
+          <span class="field-label">Mode</span>
+          <select name="closing_mode" id="closing-mode">
+            <option value="percentage" selected>Percentage range (2-5% of loan)</option>
+            <option value="itemized">Itemized</option>
+          </select>
+        </label>
+
+        <div id="itemized-extras" hidden>
+          <p class="hint-inline">Extra itemized line items (all optional):</p>
+          <label class="checkbox"><input type="checkbox" name="owners_title"> Owner's title insurance</label>
+          <label class="checkbox"><input type="checkbox" name="radon_inspection"> Radon inspection</label>
+          <label class="checkbox"><input type="checkbox" name="septic_inspection"> Septic inspection</label>
+          <label class="checkbox"><input type="checkbox" name="well_inspection"> Well inspection</label>
+          <label class="checkbox"><input type="checkbox" name="sewer_scope"> Sewer scope</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Debt-to-income <span class="optional">(optional, informational only)</span></legend>
+        <label class="field">
+          <span class="field-label">Monthly gross income</span>
+          <input type="text" inputmode="decimal" name="monthly_income">
+        </label>
+        <label class="field">
+          <span class="field-label">Existing monthly debts</span>
+          <input type="text" inputmode="decimal" name="monthly_debts">
+        </label>
+      </fieldset>
+
+      <button type="submit" id="calculate-btn">Calculate</button>
+      <p id="form-error" class="error" hidden></p>
+    </form>
+  </section>
+
+  <section class="card" id="results" hidden>
+    <h2>Results</h2>
+    <div id="results-content"></div>
+  </section>
+</main>
+
+<footer>
+  <p id="disclaimer">
+    This is a planning aid, not a quote. Figures are estimates based on user-supplied and
+    config-supplied assumptions. Actual costs come from your lender's Loan Estimate and
+    Closing Disclosure. Rates, FHA limits, and assistance-program terms change — verify
+    current figures before relying on this for a real transaction.
+  </p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

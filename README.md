@@ -62,6 +62,24 @@ Common flags (see `fha-calc --help` for the full list):
 --ocr-denoise                mild denoise pass before OCR (can help on noisy screenshots)
 ```
 
+## Web UI
+
+A local single-page web UI is available as an alternative to the CLI —
+dropdowns for county/DPA/term/UFMIP, a zone to paste (Ctrl+V), drag-drop, or
+upload a screenshot, and a results screen. It calls the same calc engine and
+OCR/extract pipeline as the CLI (`fha_calc/orchestrate.py`), and keeps the
+same rule that OCR values are proposals: extracted fields show up flagged by
+confidence for you to review/edit before anything is calculated.
+
+```bash
+.venv/bin/pip install -e ".[web]"
+fha-calc-web
+# → http://127.0.0.1:5000
+```
+
+Binds to `127.0.0.1` only by default. Override with `--host`/`--port`, or
+point at a custom config with `--config path/to/defaults.toml`.
+
 ## Tests
 
 ```bash

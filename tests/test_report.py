@@ -79,6 +79,17 @@ def test_render_report_ufmip_financed_shows_financed_not_dollars():
 # --- JSON export -----------------------------------------------------------
 
 
+def test_json_export_includes_computed_total_properties():
+    # Regression test: dataclasses.fields() doesn't see @property members,
+    # so MonthlyPayment.total / Prepaids.total / ReserveEstimate.total were
+    # silently missing from the JSON export.
+    result = _result()
+    data = to_json_dict(result)
+    assert D(data["monthly"]["total"]) == result.monthly.total
+    assert D(data["prepaids"]["total"]) == result.prepaids.total
+    assert D(data["cash_to_close"]["reserve"]["total"]) == result.cash_to_close.reserve.total
+
+
 def test_json_export_preserves_rate_precision_not_rounded_to_cents():
     # Regression test: to_json_dict used to round every Decimal to cents,
     # which corrupted rate/percentage fields (interest_rate=0.065 -> "0.07").

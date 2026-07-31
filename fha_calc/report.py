@@ -214,7 +214,17 @@ def _json_safe(value):
         # every Decimal indiscriminately would corrupt the latter.
         return str(value)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {f.name: _json_safe(getattr(value, f.name)) for f in dataclasses.fields(value)}
+        out = {f.name: _json_safe(getattr(value, f.name)) for f in dataclasses.fields(value)}
+        # dataclasses.fields() only sees declared fields, not computed
+        # @property members (Prepaids.total, ReserveEstimate.total,
+        # MonthlyPayment.total) — include those too, so the JSON export
+        # doesn't silently drop the one figure most consumers actually want.
+        for name in dir(type(value)):
+            if name.startswith("_") or name in out:
+                continue
+            if isinstance(getattr(type(value), name, None), property):
+                out[name] = _json_safe(getattr(value, name))
+        return out
     if isinstance(value, (list, tuple)):
         return [_json_safe(v) for v in value]
     if isinstance(value, dict):

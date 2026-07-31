@@ -6,8 +6,10 @@ import argparse
 import calendar
 import re
 import sys
+from dataclasses import replace as dataclass_replace
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from fha_calc.calc.closing import calculate_closing_costs
 from fha_calc.calc.credits import apply_credits
@@ -64,6 +66,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sewer-scope", action="store_true")
 
     parser.add_argument("--county", help="e.g. 'Spartanburg, SC' — used for the FHA loan-limit check")
+    parser.add_argument(
+        "--ocr-denoise", action="store_true", help="apply a mild median-blur denoise pass before OCR"
+    )
 
     parser.add_argument("--monthly-income", help="optional, enables the informational DTI check")
     parser.add_argument("--monthly-debts", help="optional, enables the informational DTI check")
@@ -181,6 +186,59 @@ def resolve_property_manual(
     )
 
     return _finalize_property(price, tax_raw, hoa_raw, ins_raw, args.county, None, config, notes)
+
+
+def resolve_property_via_image(
+    args: argparse.Namespace, config: LoanConfig, notes: list[str]
+) -> tuple[PropertyInputs, PropertyResolutionNotes]:
+    from fha_calc.confirm import (
+        confirm_fields,
+        hash_image,
+        load_cached_confirmation,
+        save_confirmation_to_cache,
+    )
+    from fha_calc.extract import Confidence, FieldCandidate, extract_fields
+    from fha_calc.ocr import run_ocr
+
+    image_path = Path(args.image)
+    image_hash = hash_image(image_path)
+    cached = load_cached_confirmation(image_hash)
+
+    if cached is not None:
+        notes.append("Using a cached confirmation from a previous run against this exact image.")
+        confirmed = cached
+    else:
+        print(f"Running OCR on {image_path}...\n")
+        ocr_result = run_ocr(image_path, denoise=args.ocr_denoise)
+        fields = extract_fields(ocr_result)
+
+        # --price/--county explicitly override/skip OCR for that field (§10)
+        # — surface the override as an already-high-confidence candidate
+        # rather than bypassing confirmation entirely, so it still shows up
+        # for the user to see (and, if they want, change).
+        if args.price is not None:
+            override_price = _parse_decimal(args.price, "--price")
+            fields = dataclass_replace(
+                fields,
+                purchase_price_candidates=(FieldCandidate(override_price, Confidence.HIGH, "--price flag"),)
+                + fields.purchase_price_candidates,
+            )
+        if args.county is not None:
+            fields = dataclass_replace(fields, county=FieldCandidate(args.county, Confidence.HIGH, "--county flag"))
+
+        confirmed = confirm_fields(fields)
+        save_confirmation_to_cache(image_hash, confirmed)
+
+    return _finalize_property(
+        confirmed.purchase_price,
+        confirmed.annual_property_tax,
+        confirmed.annual_hoa,
+        confirmed.annual_homeowners_insurance,
+        confirmed.county,
+        None,
+        config,
+        notes,
+    )
 
 
 def _days_in_next_closing_month(day_of_month: int, today: date | None = None) -> int:
@@ -366,21 +424,17 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.image and not args.manual:
-            print(
-                "Image/OCR input isn't wired up in this build yet — re-run with "
-                "--manual for now.",
-                file=sys.stderr,
-            )
-            return 1
+            property_inputs, property_notes = resolve_property_via_image(args, config, notes)
+        else:
+            property_inputs, property_notes = resolve_property_manual(args, config, notes)
 
-        property_inputs, property_notes = resolve_property_manual(args, config, notes)
         buyer = build_buyer_profile(args, config)
         credits_in = build_credits(args, config)
         result = run_calculation(property_inputs, property_notes, buyer, credits_in, args, config, notes)
     except FhaCalcError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
-    except ValueError as e:
+    except (ValueError, FileNotFoundError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
